@@ -1,25 +1,23 @@
 import streamlit as st
 import pandas as pd
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
 import io
 import zipfile
 import os
 
 st.set_page_config(page_title="參加證明生成系統", layout="wide")
 
-# 設定中文字型路徑 (請確保資料夾內有此字型檔，否則中文會變方塊)
-FONT_PATH = "NotoSansTC-Regular.ttf"  # 請替換為您實際的字型檔案名稱，如 'msjh.ttc'
+# 設定中文字型路徑 (請確保資料夾內有此字型檔)
+FONT_PATH = "NotoSansTC-Regular.ttf"
 
-def generate_cert(bg_image, course_name, student_name, date_str, hours_str):
+def generate_cert(bg_image, course_name, student_name, date_str, hours_str, y_pos, colors):
     """
-    根據背景圖片與輸入資訊生成單張參加證明
+    根據背景圖片、輸入資訊與排版設定生成參加證明
     """
-    # 複製圖片以免改動到原始背景
     img = bg_image.copy()
     draw = ImageDraw.Draw(img)
     
     try:
-        # 設定不同大小的字型 (若無字型檔會報錯，請務必提供)
         font_large = ImageFont.truetype(FONT_PATH, 60)
         font_medium = ImageFont.truetype(FONT_PATH, 48)
         font_small = ImageFont.truetype(FONT_PATH, 36)
@@ -27,33 +25,32 @@ def generate_cert(bg_image, course_name, student_name, date_str, hours_str):
         st.error(f"找不到字型檔 {FONT_PATH}，請確認檔案是否存在！")
         return img
 
-    # 取得圖片寬高以利置中計算
     W, H = img.size
 
-    # --- 文字寫入座標設定 (可依據實際背板微調) ---
+    # --- 文字寫入 (套用動態 Y 座標與顏色) ---
     # 課程名稱
     course_text = f"課程名稱：{course_name}"
     _, _, w, h = draw.textbbox((0, 0), course_text, font=font_medium)
-    draw.text(((W-w)/2, H*0.35), course_text, font=font_medium, fill=(80, 40, 20))
+    draw.text(((W-w)/2, H * y_pos['course']), course_text, font=font_medium, fill=colors['course'])
 
     # 茲證明
     certify_text = "茲證明"
     _, _, w, h = draw.textbbox((0, 0), certify_text, font=font_small)
-    draw.text(((W-w)/2, H*0.43), certify_text, font=font_small, fill=(0, 0, 0))
+    draw.text(((W-w)/2, H * y_pos['certify']), certify_text, font=font_small, fill=colors['text'])
 
     # 學員姓名
     _, _, w, h = draw.textbbox((0, 0), student_name, font=font_large)
-    draw.text(((W-w)/2, H*0.48), student_name, font=font_large, fill=(80, 20, 20))
+    draw.text(((W-w)/2, H * y_pos['name']), student_name, font=font_large, fill=colors['name'])
 
     # 先生/女士
     title_text = "先生/女士"
     _, _, w, h = draw.textbbox((0, 0), title_text, font=font_small)
-    draw.text(((W-w)/2, H*0.56), title_text, font=font_small, fill=(0, 0, 0))
+    draw.text(((W-w)/2, H * y_pos['title']), title_text, font=font_small, fill=colors['text'])
 
     # 參加說明
     desc_text = "參加上述課程並完成學習，特發此證以資證明。"
     _, _, w, h = draw.textbbox((0, 0), desc_text, font=font_medium)
-    draw.text(((W-w)/2, H*0.62), desc_text, font=font_medium, fill=(0, 0, 0))
+    draw.text(((W-w)/2, H * y_pos['desc']), desc_text, font=font_medium, fill=colors['text'])
 
     # 日期與時數
     date_display = f"上課日期：{date_str}"
@@ -61,38 +58,76 @@ def generate_cert(bg_image, course_name, student_name, date_str, hours_str):
     _, _, w1, h1 = draw.textbbox((0, 0), date_display, font=font_medium)
     _, _, w2, h2 = draw.textbbox((0, 0), hours_display, font=font_medium)
     
-    draw.text(((W-w1)/2, H*0.72), date_display, font=font_medium, fill=(50, 50, 50))
-    draw.text(((W-w2)/2, H*0.78), hours_display, font=font_medium, fill=(50, 50, 50))
+    draw.text(((W-w1)/2, H * y_pos['date']), date_display, font=font_medium, fill=colors['date_hours'])
+    draw.text(((W-w2)/2, H * y_pos['hours']), hours_display, font=font_medium, fill=colors['date_hours'])
 
     return img
 
 st.title("🎓 參加證明批次生成系統")
 
 # --- 側邊欄：背板設定 ---
-st.sidebar.header("🖼️ 背景圖片設定")
-bg_option = st.sidebar.radio("選擇背板來源", ["預設背板 1", "預設背板 2", "預設背板 3", "自行上傳背板"])
+st.sidebar.header("🖼️ 1. 背景圖片設定")
+bg_option = st.sidebar.radio("選擇背板來源", ["自行上傳背板", "預設背板 1", "預設背板 2", "預設背板 3"])
 
-# 處理背板圖片載入
 bg_image = None
 if bg_option == "自行上傳背板":
     uploaded_bg = st.sidebar.file_uploader("上傳背板圖片 (PNG/JPG)", type=["png", "jpg", "jpeg"])
     if uploaded_bg:
-        bg_image = Image.open(uploaded_bg)
+        try:
+            bg_image = Image.open(uploaded_bg).convert("RGB")
+        except UnidentifiedImageError:
+            st.sidebar.error("上傳的檔案非有效圖片格式，請重新上傳。")
 else:
-    # 這裡假設您有 bg1.png, bg2.png, bg3.png 在目錄中
     bg_dict = {"預設背板 1": "bg1.png", "預設背板 2": "bg2.png", "預設背板 3": "bg3.png"}
     bg_path = bg_dict[bg_option]
     if os.path.exists(bg_path):
-        bg_image = Image.open(bg_path)
+        try:
+            bg_image = Image.open(bg_path).convert("RGB")
+        except UnidentifiedImageError:
+            st.sidebar.error(f"檔案 {bg_path} 損毀或格式錯誤。")
     else:
-        st.sidebar.warning(f"找不到預設圖片 {bg_path}，請上傳或補齊檔案。")
+        st.sidebar.warning(f"找不到 {bg_path}。請上傳圖片，或在專案資料夾放入該檔。")
+
+# 如果真的沒有圖片，建立一張全白底圖當作預設，避免程式崩潰
+if bg_image is None:
+    bg_image = Image.new('RGB', (1600, 1200), color=(255, 255, 255))
+    st.sidebar.info("目前使用全白預設背景。")
+
+# --- 側邊欄：排版與顏色微調 ---
+st.sidebar.header("✍️ 2. 文字排版與顏色微調")
+with st.sidebar.expander("展開微調面板 (調整座標與顏色)", expanded=False):
+    st.markdown("**顏色設定**")
+    col_c1, col_c2 = st.columns(2)
+    with col_c1:
+        color_course = st.color_picker("課程名稱顏色", "#502814")
+        color_name = st.color_picker("姓名顏色", "#501414")
+    with col_c2:
+        color_text = st.color_picker("一般內文顏色", "#000000")
+        color_date_hours = st.color_picker("日期時數顏色", "#323232")
+    
+    colors = {
+        'course': color_course, 'name': color_name, 
+        'text': color_text, 'date_hours': color_date_hours
+    }
+
+    st.markdown("**上下位置設定 (數值越大越靠下)**")
+    y_pos = {
+        'course': st.slider("課程名稱 Y 座標", 0.0, 1.0, 0.35, 0.01),
+        'certify': st.slider("茲證明 Y 座標", 0.0, 1.0, 0.43, 0.01),
+        'name': st.slider("姓名 Y 座標", 0.0, 1.0, 0.48, 0.01),
+        'title': st.slider("先生/女士 Y 座標", 0.0, 1.0, 0.56, 0.01),
+        'desc': st.slider("參加說明 Y 座標", 0.0, 1.0, 0.62, 0.01),
+        'date': st.slider("日期 Y 座標", 0.0, 1.0, 0.72, 0.01),
+        'hours': st.slider("時數 Y 座標", 0.0, 1.0, 0.78, 0.01)
+    }
+
 
 # --- 主畫面：功能分頁 ---
 tab1, tab2 = st.tabs(["📄 單張生成", "📑 Excel 批次生成"])
 
 # -- 分頁 1：單張生成 --
 with tab1:
-    st.subheader("個別學員證明生成")
+    st.subheader("個別學員證明生成與預覽")
     col1, col2 = st.columns(2)
     
     with col1:
@@ -102,67 +137,59 @@ with tab1:
         date_val = st.text_input("上課日期", value="7/6~7/16")
         hours_val = st.text_input("修習時數", value="共8小時")
     
-    if st.button("預覽並生成單張證明", type="primary"):
-        if bg_image is None:
-            st.error("請先在左側設定有效的背板圖片！")
-        else:
-            result_img = generate_cert(bg_image, course, name, date_val, hours_val)
-            st.image(result_img, caption=f"{name} 的參加證明", use_container_width=True)
-            
-            # 提供下載
-            buf = io.BytesIO()
-            result_img.save(buf, format="PNG")
-            byte_im = buf.getvalue()
-            st.download_button(
-                label="下載圖片",
-                data=byte_im,
-                file_name=f"{name}_參加證明.png",
-                mime="image/png"
-            )
+    # 即時預覽 (只要參數有變就會自動更新)
+    st.markdown("### 👀 即時預覽")
+    result_img = generate_cert(bg_image, course, name, date_val, hours_val, y_pos, colors)
+    st.image(result_img, caption="調整左側面板可即時看到排版變化", use_container_width=True)
+    
+    # 提供下載
+    buf = io.BytesIO()
+    result_img.save(buf, format="PNG")
+    st.download_button(
+        label="📥 下載此張圖片",
+        data=buf.getvalue(),
+        file_name=f"{name}_參加證明.png",
+        mime="image/png"
+    )
 
 # -- 分頁 2：批次生成 --
 with tab2:
     st.subheader("批次生成 (上傳 Excel)")
-    st.markdown("請上傳包含 `姓名` 欄位的 Excel 檔案。若有 `課程名稱`、`上課日期`、`修習時數` 欄位，系統將自動讀取；若無，則使用下方設定的統一數值。")
+    st.markdown("請上傳包含 `姓名` 欄位的 Excel 檔案。若有 `課程名稱`、`上課日期`、`修習時數` 欄位則自動讀取；若無，使用下方預設值。")
     
     col3, col4 = st.columns(2)
     with col3:
-        batch_course = st.text_input("統一課程名稱 (若Excel無該欄位)", value="iPAS 初級AI應用規劃師 重點培訓班")
-        batch_date = st.text_input("統一上課日期 (若Excel無該欄位)", value="7/6~7/16")
+        batch_course = st.text_input("統一課程名稱", value="iPAS 初級AI應用規劃師 重點培訓班")
+        batch_date = st.text_input("統一上課日期", value="7/6~7/16")
     with col4:
-        batch_hours = st.text_input("統一修習時數 (若Excel無該欄位)", value="共8小時")
+        batch_hours = st.text_input("統一修習時數", value="共8小時")
 
     uploaded_excel = st.file_uploader("上傳學員名單 Excel", type=["xlsx", "xls"])
 
-    if uploaded_excel and bg_image:
+    if uploaded_excel:
         df = pd.read_excel(uploaded_excel)
         st.write("預覽資料：", df.head())
         
         if '姓名' not in df.columns:
             st.error("Excel 檔案中找不到「姓名」欄位，請檢查檔案格式！")
         else:
-            if st.button("開始批次生成並打包下載"):
-                # 建立 ZIP 暫存
+            if st.button("開始批次生成並打包下載", type="primary"):
                 zip_buffer = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer, "w") as zip_file:
                     progress_bar = st.progress(0)
                     total = len(df)
                     
                     for index, row in df.iterrows():
-                        # 動態讀取欄位，若無則用預設值
                         s_name = str(row['姓名'])
-                        s_course = str(row['課程名稱']) if '課程名稱' in df.columns else batch_course
-                        s_date = str(row['上課日期']) if '上課日期' in df.columns else batch_date
-                        s_hours = str(row['修習時數']) if '修習時數' in df.columns else batch_hours
+                        s_course = str(row['課程名稱']) if '課程名稱' in df.columns and pd.notna(row['課程名稱']) else batch_course
+                        s_date = str(row['上課日期']) if '上課日期' in df.columns and pd.notna(row['上課日期']) else batch_date
+                        s_hours = str(row['修習時數']) if '修習時數' in df.columns and pd.notna(row['修習時數']) else batch_hours
                         
-                        cert_img = generate_cert(bg_image, s_course, s_name, s_date, s_hours)
+                        cert_img = generate_cert(bg_image, s_course, s_name, s_date, s_hours, y_pos, colors)
                         
-                        # 將圖片存入 zip
                         img_byte_arr = io.BytesIO()
                         cert_img.save(img_byte_arr, format='PNG')
                         zip_file.writestr(f"{s_name}_參加證明.png", img_byte_arr.getvalue())
-                        
-                        # 更新進度條
                         progress_bar.progress((index + 1) / total)
                 
                 st.success("✅ 批次生成完成！請點擊下方按鈕下載壓縮檔。")
@@ -172,5 +199,3 @@ with tab2:
                     file_name="certificates.zip",
                     mime="application/zip"
                 )
-    elif uploaded_excel and bg_image is None:
-        st.warning("請先在左側設定背板圖片才能進行批次生成。")
