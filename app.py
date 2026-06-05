@@ -114,11 +114,11 @@ with st.sidebar.expander("展開微調面板 (調整座標與顏色)", expanded=
     y_pos = {
         'course': st.slider("課程名稱 Y 座標", 0.0, 1.0, 0.32, 0.01),
         'certify': st.slider("茲證明 Y 座標", 0.0, 1.0, 0.35, 0.01),
-        'name': st.slider("姓名 Y 座標", 0.0, 1.0, 0.37, 0.01),
-        'title': st.slider("先生/女士 Y 座標", 0.0, 1.0, 0.41, 0.01),
-        'desc': st.slider("參加說明 Y 座標", 0.0, 1.0, 0.44, 0.01),
-        'date': st.slider("日期 Y 座標", 0.0, 1.0, 0.55, 0.01),
-        'hours': st.slider("時數 Y 座標", 0.0, 1.0, 0.59, 0.01)
+        'name': st.slider("姓名 Y 座標", 0.0, 1.0, 0.38, 0.01),
+        'title': st.slider("先生/女士 Y 座標", 0.0, 1.0, 0.42, 0.01),
+        'desc': st.slider("參加說明 Y 座標", 0.0, 1.0, 0.47, 0.01),
+        'date': st.slider("日期 Y 座標", 0.0, 1.0, 0.56, 0.01),
+        'hours': st.slider("時數 Y 座標", 0.0, 1.0, 0.595, 0.01)
     }
 
 
