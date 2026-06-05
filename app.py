@@ -133,7 +133,7 @@ with tab1:
     with col1:
         default_course = "iPAS 初級AI應用規劃師 重點培訓班"
         course = st.text_input("課程名稱", value=default_course)
-        name = st.text_input("學員姓名", value="陳思愷")
+        name = st.text_input("學員姓名", value="陳宏銘")
         date_val = st.text_input("上課日期", value="7/6~7/16")
         hours_val = st.text_input("修習時數", value="共8小時")
     
