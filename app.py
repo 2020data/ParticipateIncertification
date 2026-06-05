@@ -8,7 +8,7 @@ import os
 st.set_page_config(page_title="參加證明生成系統", layout="wide")
 
 # 設定中文字型路徑 (請確保資料夾內有此字型檔)
-FONT_PATH = "NotoSansTC-Regular.ttf"
+FONT_PATH = "wt064.ttf"#"NotoSansTC-Regular.ttf"
 
 def generate_cert(bg_image, course_name, student_name, date_str, hours_str, y_pos, colors):
     """
